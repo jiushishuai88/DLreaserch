@@ -1,3 +1,4 @@
 *.pth.*
-*.ta
+*.tar
+*.zip
 /data
