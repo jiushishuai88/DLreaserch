@@ -6,6 +6,7 @@ from .vggResidualProposed import *
 from .preresnet import *
 from .preresneXt import *
 from .densenet import *
+from  .sePreResNeXt import *
 
 
 def get_model(config):
