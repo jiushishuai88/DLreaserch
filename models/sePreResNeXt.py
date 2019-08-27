@@ -20,7 +20,7 @@ class BottleNeck(nn.Module):
         self.relu = nn.ReLU(inplace=True)
         self.downsample = downsample
         self.stride = stride
-        self.globalAvgPool = nn.AvgPool2d(32//index,stride=1)
+        self.globalAvgPool = nn.AvgPool2d(32//(2**(index-1)),stride=1)
         self.fc1 = nn.Linear(out_channel,round(out_channel/16))
         self.fc2 = nn.Linear(round(out_channel/16),out_channel)
         self.sigmoid = nn.Sigmoid()

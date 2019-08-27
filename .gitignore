@@ -2,3 +2,6 @@
 *.tar
 *.zip
 /data
+.gitignore
+/.idea
+/venv
