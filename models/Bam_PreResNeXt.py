@@ -5,6 +5,58 @@ import torch
 __all__ = ['bam_preresneXt29_32x8d']
 
 
+class ChannelPool(nn.Module):
+    def forward(self, x):
+        return torch.cat((torch.max(x, 1)[0].unsqueeze(1), torch.mean(x, 1).unsqueeze(1)), dim=1)
+
+
+class SpatialGate(nn.Module):
+    def __init__(self):
+        super(SpatialGate, self).__init__()
+        self.compress = ChannelPool()
+        self.conv = nn.Conv2d(2, 1, kernel_size=7, stride=1, padding=3, bias=False)
+
+    def forward(self, x):
+        out = self.compress(x)
+        out = self.conv(out)
+        out = torch.sigmoid(out)
+        return x * out
+
+
+class Flatten(nn.Module):
+    def forward(self, x):
+        return x.view(x.size(0), -1)
+
+
+class ChannelGate(nn.Module):
+    def __init__(self, gate_channels):
+        super(ChannelGate,self).__init__()
+        self.gate_channels = gate_channels
+        self.mlp = nn.Sequential(Flatten(), nn.Linear(gate_channels, gate_channels // 16),
+                                 nn.ReLU(inplace=True), nn.Linear(gate_channels // 16, gate_channels))
+
+    def forward(self, x):
+        mavg = F.avg_pool2d(x, (x.size(2), x.size(3)), stride=(x.size(2), x.size(3)))
+        mavg = self.mlp(mavg)
+        mmax = F.max_pool2d(x, (x.size(2), x.size(3)), stride=(x.size(2), x.size(3)))
+        mmax = self.mlp(mmax)
+        mf = mavg + mmax
+        mf = torch.sigmoid(mf).unsqueeze(2).unsqueeze(3).expand_as(x)
+        return x * mf
+
+
+class CBAM(nn.Module):
+    def __init__(self, gate_channels):
+        super(CBAM, self).__init__()
+        self.channel_gate = ChannelGate(gate_channels)
+        self.spatial_gate = SpatialGate()
+
+    def forward(self, x):
+        out = self.channel_gate(x)
+        out = self.spatial_gate(out)
+        return out
+
+
 class BottleNeck(nn.Module):
     def __init__(self, in_channel, out_channel, cardinality=8, base_width=64, index=1, stride=1, downsample=None):
         super(BottleNeck, self).__init__()
@@ -20,19 +72,7 @@ class BottleNeck(nn.Module):
 
         self.relu = nn.ReLU(inplace=True)
         self.downsample = downsample
-        self.stride = stride
-        self.globalAvgPool = nn.AvgPool2d(32 // (2 ** (index - 1)), stride=1)
-        self.fc1 = nn.Linear(out_channel, round(out_channel / 16))
-        self.fc2 = nn.Linear(round(out_channel / 16), out_channel)
-        self.sigmoid = nn.Sigmoid()
-
-        self.conv_ms1 = nn.Conv2d(out_channel, out_channel // 16, kernel_size=1, stride=1, padding=0, bias=False)
-        self.conv_ms2 = nn.Conv2d(out_channel // 16, out_channel // 16, kernel_size=3, stride=1, padding=4, bias=False,
-                                  dilation=4)
-        self.conv_ms3 = nn.Conv2d(out_channel // 16, out_channel // 16, kernel_size=3, stride=1, padding=4, bias=False,
-                                  dilation=4)
-        self.conv_ms4 = nn.Conv2d(out_channel // 16, 1, kernel_size=1, stride=1, padding=0, bias=False)
-        self.bn_16 = nn.BatchNorm2d(out_channel // 16)
+        self.CBAM = CBAM(out_channel)
 
     def forward(self, x):
         residual = x
@@ -51,37 +91,16 @@ class BottleNeck(nn.Module):
 
         if self.downsample is not None:
             residual = self.downsample(x)
-        mc = out
-        ms = out
 
-        mc = self.globalAvgPool(mc)
-        mc = mc.view(mc.size(0), -1)
-        mc = self.fc1(mc)
-        mc = self.relu(mc)
-        mc = self.fc2(mc)
-        mc = self.sigmoid(mc)
-        mc = mc.view(mc.size(0), mc.size(1), 1, 1)
-        mc = mc.expand_as(out)
+        out = self.CBAM(out)
 
-        ms = self.conv_ms1(ms)
-        ms = self.bn_16(ms)
-        ms = self.relu(ms)
-        ms = self.conv_ms2(ms)
-        ms = self.bn_16(ms)
-        ms = self.relu(ms)
-        ms = self.conv_ms3(ms)
-        ms = self.bn_16(ms)
-        ms = self.relu(ms)
-        ms = self.conv_ms4(ms)
-        ms = ms.expand_as(out)
-
-        return out + torch.sigmoid(ms + mc) * out
+        return out + residual
 
 
 class BamPreResneXt(nn.Module):
     def __init__(self, depth, num_classes=100, cardinality=8, base_width=64):
         super(BamPreResneXt, self).__init__()
-        assert (depth - 2) % 9 == 0, "When use bottleneck, depth 12n+2"
+        assert (depth - 2) % 9 == 0, "When use bottleneck, depth 9n+2"
         n = (depth - 2) // 9
         block = BottleNeck
         self.cardinality = cardinality
@@ -97,6 +116,13 @@ class BamPreResneXt(nn.Module):
         self.relu = nn.ReLU(inplace=True)
         self.avgpool = nn.AvgPool2d(kernel_size=8, stride=1)
         self.fc = nn.Linear(1024, num_classes)
+
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal_(m.weight.data)
+            elif isinstance(m, nn.BatchNorm2d):
+                m.weight.data.fill_(1)
+                m.bias.data.zero_()
 
     def _make_layer(self, block, channels, blocks, index=1, stride=1):  # 16 10
         downsample = None

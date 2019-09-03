@@ -8,6 +8,8 @@ from .preresneXt import *
 from .densenet import *
 from  .sePreResNeXt import *
 from  .Bam_PreResNeXt import *
+from  .GE_PreResNeXt import *
+from .SK_PreResNeXt import *
 
 
 def get_model(config):
