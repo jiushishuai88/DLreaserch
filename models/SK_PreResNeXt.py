@@ -6,12 +6,12 @@ __all__ = ['sk_preresneXt29_32x8d']
 
 
 class SKConv(nn.Module):
-    def __init__(self, channel, M, cardinality):
+    def __init__(self, channel, M, cardinality,stride):
         super(SKConv, self).__init__()
         d = max(channel // 32, 32)
         self.convs = nn.ModuleList([])
         for i in range(M):
-            self.convs.append(nn.Sequential(nn.Conv2d(channel, channel, kernel_size=3, dilation=1 + i, stride=1, padding=1 + i,groups=cardinality),
+            self.convs.append(nn.Sequential(nn.Conv2d(channel, channel, kernel_size=3, dilation=1+i, stride=stride, padding=1+i,groups=cardinality),
                               nn.BatchNorm2d(channel),
                               nn.ReLU(inplace=True)
                               ))
@@ -25,21 +25,22 @@ class SKConv(nn.Module):
 
     def forward(self, x):
         for i, conv in enumerate(self.convs):
-            temp = conv(x).unsqueeze_(dim=1)
+            temp = conv(x).unsqueeze(dim=1)
             if i == 0:
                 feas = temp
             else:
                 feas = torch.cat([feas, temp], dim=1)
         U = torch.sum(feas, dim=1)
-        S = self.globalpool(U).squeeze_()
+        S = self.globalpool(U).squeeze()
         Z = self.fc(S)
         for i, fc in enumerate(self.fcs):
-            tempa = fc(Z).unsqueeze_(dim=1)
+            tempa = fc(Z).unsqueeze(dim=1)
             if i == 0:
                 a = tempa
             else:
                 a = torch.cat([a, tempa], dim=1)
-        A = self.softmax(a).unsqueeze_(dim=-1).unsqueeze_(dim=-1)
+        A = self.softmax(a)
+        A = A.unsqueeze(dim=-1).unsqueeze(dim=-1)
         V = torch.sum(feas * A, dim=1)
         return V
 
@@ -52,7 +53,7 @@ class BottleNeck(nn.Module):
         self.conv_1 = nn.Conv2d(in_channel, D, kernel_size=1, stride=1, padding=0, bias=False)
 
         self.bn_2 = nn.BatchNorm2d(D)
-        self.conv_2 = SKConv(D, 2, cardinality)
+        self.conv_2 = SKConv(D, 2, cardinality,stride)
 
         self.bn_3 = nn.BatchNorm2d(D)
         self.conv_3 = nn.Conv2d(D, out_channel, kernel_size=1, stride=1, padding=0, bias=False)
@@ -77,7 +78,6 @@ class BottleNeck(nn.Module):
 
         if self.downsample is not None:
             residual = self.downsample(x)
-
         return out + residual
 
 
@@ -121,6 +121,7 @@ class SKPreResneXt(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, x):
+        torch.autograd.set_detect_anomaly(True)
         x = self.conv_1(x)  # out 32x32x16
 
         x = self.layer1(x)  # out 32x32x16
@@ -137,4 +138,4 @@ class SKPreResneXt(nn.Module):
 
 
 def sk_preresneXt29_32x8d(num_class):
-    return SKPreResneXt(depth=29, num_classes=num_class, cardinality=32, base_width=8)
+    return SKPreResneXt(depth=29, num_classes=num_class, cardinality=16, base_width=8)
