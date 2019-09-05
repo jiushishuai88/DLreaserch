@@ -1,10 +1,10 @@
 # net architecture
-architecture: ge_preresneXt29_32x8d
+architecture: sk_preresneXt29_16x8d
 
 # log and checkpoint
 data_path: ./data
 ckpt_path: ./
-ckpt_name: ge_preresneXt29_32x8d
+ckpt_name: sk_preresneXt29_16x8d
 
 # datasets
 num_classes: 100
@@ -13,7 +13,7 @@ dataset: cifar100
 # training parameters
 use_gpu: True
 input_size: 32
-epochs: 300
+epochs: 250
 batch_size: 128
 test_batch: 200
 eval_freq: 2

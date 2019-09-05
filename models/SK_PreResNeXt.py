@@ -2,7 +2,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch
 
-__all__ = ['sk_preresneXt29_32x8d']
+__all__ = ['sk_preresneXt29_32x8d','sk_preresneXt29_16x8d']
 
 
 class SKConv(nn.Module):
@@ -138,4 +138,7 @@ class SKPreResneXt(nn.Module):
 
 
 def sk_preresneXt29_32x8d(num_class):
+    return SKPreResneXt(depth=29, num_classes=num_class, cardinality=32, base_width=8)
+
+def sk_preresneXt29_16x8d(num_class):
     return SKPreResneXt(depth=29, num_classes=num_class, cardinality=16, base_width=8)
