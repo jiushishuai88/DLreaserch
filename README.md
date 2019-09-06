@@ -1,10 +1,12 @@
 #here are some cnn experiments
+
 ##argumentation:4-pixel padding random cropping,horizontal flipping
+
 ##usage:
 e.g:
-CUDA_VISIBLE_DEVICES=0 python -u train.py --work-path ./configs/cifar10/lenet
+CUDA_VISIBLE_DEVICES=0 python -u train.py --work-path ./experiments/cifar10/lenet
 
-CUDA_VISIBLE_DEVICES=0 python -u train.py --work-path ./configs/cifar100/GePreresneXt29_32x8d --resume
+CUDA_VISIBLE_DEVICES=0 python -u train.py --work-path ./experiments/cifar100/GePreresneXt29_32x8d --resume
 
 
 | architecture          | params | batch size | epoch | C100 test acc (%) |
@@ -20,5 +22,5 @@ CUDA_VISIBLE_DEVICES=0 python -u train.py --work-path ./configs/cifar100/GePrere
 | dense_bc_100_12       |800032  |    128     |  250  |       76.53       |
 | BamPreresneXt29_32x8d |8213350 |    128     |  250  |     **79.71**     |
 | GePreresneXt29_32x8d  |9593764 |    128     |  250  |       77.85       |
-| sePreresneXt29_32x8d  |7690660 |    128     |  250  |       79.71       |
+| sePreresneXt29_32x8d  |7690660 |    128     |  250  |       79.48       |
 | SKPreresneXt29_16x8d  |4865732 |    128     |  250  |       78.47       |
