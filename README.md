@@ -1,6 +1,6 @@
 #here are some cnn experiments
 
-##argumentation:4-pixel padding random cropping,horizontal flipping
+##augmentation:4-pixel padding random cropping,horizontal flipping
 
 ##usage:
 e.g:
